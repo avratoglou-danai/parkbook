@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>🚗 ParkBook</title>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     FIREBASE SDK (v9 compat)
+     ═══════════════════════════════════════════════════════════════════ -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+<style>
+/* ───────────────────────────────────────────────
+   ROOT & RESET
+─────────────────────────────────────────────── */
+:root{
+  --primary:#1a73e8;--primary-dark:#1557b0;--primary-light:#e8f0fe;
+  --success:#34a853;--warning:#fbbc04;--danger:#ea4335;
+  --bg:#f0f4f9;--card:#fff;--text:#202124;--subtext:#5f6368;
+  --border:#dadce0;--radius:14px;--shadow:0 2px 14px rgba(0,0,0,0.09);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+a{color:var(--primary);text-decoration:none;}
+a:hover{text-decoration:underline;}
+
+/* ───────────────────────────────────────────────
+   AUTH SCREENS
+─────────────────────────────────────────────── */
+#authScreen{
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;background:linear-gradient(135deg,#1a73e8 0%,#0d47a1 100%);
+  padding:16px;
+}
+.auth-card{
+  background:var(--card);border-radius:var(--radius);box-shadow:0 8px 32px rgba(0,0,0,0.18);
+  padding:40px 36px;width:100%;max-width:420px;
+}
+.auth-logo{text-align:center;font-size:2.2rem;font-weight:800;color:var(--primary);margin-bottom:6px;}
+.auth-sub{text-align:center;color:var(--subtext);font-size:0.9rem;margin-bottom:28px;}
+.auth-tabs{display:flex;border-radius:10px;overflow:hidden;border:1.5px solid var(--border);margin-bottom:26px;}
+.auth-tab{
+  flex:1;padding:10px;text-align:center;cursor:pointer;font-weight:600;font-size:0.93rem;
+  background:white;color:var(--subtext);transition:all .2s;border:none;
+}
+.auth-tab.active{background:var(--primary);color:white;}
+.form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+.form-group label{font-size:0.83rem;font-weight:600;color:var(--subtext);}
+.form-group input{
+  padding:11px 14px;border:1.5px solid var(--border);border-radius:9px;
+  font-size:0.95rem;color:var(--text);outline:none;transition:border .2s;background:white;
+}
+.form-group input:focus{border-color:var(--primary);}
+.btn{
+  padding:11px 22px;border:none;border-radius:9px;font-size:0.95rem;font-weight:600;
+  cursor:pointer;transition:background .2s,transform .1s;display:inline-flex;align-items:center;
+  justify-content:center;gap:7px;
+}
+.btn:active{transform:scale(0.97);}
+.btn-primary{background:var(--primary);color:white;}
+.btn-primary:hover{background:var(--primary-dark);}
+.btn-block{width:100%;}
+.btn-success{background:var(--success);color:white;}
+.btn-success:hover{background:#2d8f47;}
+.btn-danger{background:var(--danger);color:white;}
+.btn-danger:hover{background:#c5392c;}
+.btn-warning{background:var(--warning);color:#333;}
+.btn-sm{padding:6px 13px;font-size:0.82rem;}
+.btn-ghost{background:transparent;border:1.5px solid var(--border);color:var(--text);}
+.btn-ghost:hover{background:var(--bg);}
+.auth-err{
+  background:#fde8e8;border-left:4px solid var(--danger);padding:10px 14px;
+  border-radius:8px;font-size:0.88rem;margin-bottom:14px;display:none;
+}
+
+/* ───────────────────────────────────────────────
+   MAIN APP
+─────────────────────────────────────────────── */
+#appScreen{display:none;}
+
+/* TOP NAV */
+.topnav{
+  background:var(--primary);color:white;display:flex;align-items:center;
+  justify-content:space-between;padding:0 24px;height:62px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.15);position:sticky;top:0;z-index:100;
+}
+.topnav .logo{font-size:1.25rem;font-weight:800;display:flex;align-items:center;gap:9px;white-space:nowrap;}
+.nav-links{display:flex;gap:4px;}
+.nav-links button{
+  background:transparent;border:none;color:white;padding:8px 14px;border-radius:8px;
+  cursor:pointer;font-size:0.9rem;font-weight:500;transition:background .2s;white-space:nowrap;
+}
+.nav-links button:hover,.nav-links button.active{background:rgba(255,255,255,0.2);}
+.nav-right{display:flex;align-items:center;gap:10px;}
+.notif-bell{position:relative;cursor:pointer;font-size:1.35rem;padding:4px 8px;border-radius:8px;transition:background .2s;}
+.notif-bell:hover{background:rgba(255,255,255,0.2);}
+.notif-badge{
+  position:absolute;top:-2px;right:-2px;background:var(--danger);color:white;
+  font-size:0.62rem;font-weight:800;border-radius:50%;width:17px;height:17px;
+  display:none;align-items:center;justify-content:center;
+}
+.user-avatar{
+  width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.3);
+  color:white;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:0.88rem;cursor:pointer;flex-shrink:0;
+  border:2px solid rgba(255,255,255,0.5);
+}
+.btn-logout{
+  background:rgba(255,255,255,0.15);border:none;color:white;
+  padding:7px 13px;border-radius:8px;cursor:pointer;font-size:0.85rem;
+  font-weight:600;transition:background .2s;
+}
+.btn-logout:hover{background:rgba(255,255,255,0.28);}
+
+/* NOTIFICATION BANNER */
+.notif-banner{
+  background:#e8f5e9;border-left:4px solid var(--success);
+  padding:13px 20px;margin:16px 24px 0;border-radius:var(--radius);
+  display:none;font-size:0.92rem;animation:slideIn .4s ease;flex-direction:column;gap:8px;
+}
+.notif-banner.show{display:flex;}
+.notif-item-banner{display:flex;align-items:center;gap:10px;width:100%;}
+.notif-item-banner button{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--subtext);font-size:1rem;}
+@keyframes slideIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+
+/* MAIN CONTENT */
+.main{max-width:980px;margin:0 auto;padding:22px 16px 60px;}
+.section{display:none;}
+.section.active{display:block;}
+
+/* CARDS */
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;margin-bottom:20px;}
+.card h2{font-size:1.08rem;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+
+/* FORM INLINE ROW */
+.form-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;}
+.form-row .form-group{margin-bottom:0;}
+
+/* STATUS BAR */
+.status-bar{
+  display:flex;align-items:center;gap:10px;padding:12px 16px;
+  border-radius:10px;margin-bottom:14px;font-weight:600;font-size:0.93rem;
+}
+.status-available{background:#e6f4ea;color:#1e7e34;}
+.status-almost{background:#fff3cd;color:#856404;}
+.status-full{background:#fde8e8;color:#b00020;}
+.status-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+.dot-green{background:var(--success);}
+.dot-orange{background:var(--warning);}
+.dot-red{background:var(--danger);}
+
+/* PROGRESS BAR */
+.progress-wrap{background:var(--border);border-radius:6px;height:8px;margin-bottom:18px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:6px;transition:width .4s;}
+
+/* BOOKINGS & WAITLIST */
+.list{display:flex;flex-direction:column;gap:8px;}
+.booking-item{
+  display:flex;align-items:center;gap:12px;padding:11px 14px;
+  background:#f8f9fa;border-radius:10px;border:1px solid var(--border);
+}
+.waiting-item{
+  display:flex;align-items:center;gap:12px;padding:11px 14px;
+  background:#fffbf0;border-radius:10px;border:1px solid #ffe082;
+}
+.avatar{
+  width:37px;height:37px;border-radius:50%;background:var(--primary);color:white;
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.93rem;flex-shrink:0;
+}
+.avatar-warn{background:var(--warning);color:#333;}
+.item-info{flex:1;min-width:0;}
+.item-name{font-weight:600;font-size:0.96rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.item-sub{font-size:0.77rem;color:var(--subtext);}
+.spot-badge{background:var(--primary);color:white;border-radius:6px;padding:3px 9px;font-size:0.79rem;font-weight:700;white-space:nowrap;}
+.wait-badge{background:var(--warning);color:#333;border-radius:6px;padding:3px 9px;font-size:0.79rem;font-weight:700;}
+.notified-badge{background:var(--success);color:white;border-radius:6px;padding:3px 9px;font-size:0.78rem;font-weight:700;animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.section-label{font-size:0.8rem;font-weight:700;color:var(--subtext);text-transform:uppercase;letter-spacing:.08em;margin:18px 0 8px;}
+.empty-msg{text-align:center;color:var(--subtext);padding:20px;font-size:0.9rem;}
+
+/* DATE TABS */
+.date-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+.date-tab{
+  padding:8px 15px;border-radius:20px;border:1.5px solid var(--border);
+  background:white;cursor:pointer;font-size:0.86rem;font-weight:600;
+  transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:2px;
+}
+.date-tab:hover{border-color:var(--primary);color:var(--primary);}
+.date-tab.active{background:var(--primary);color:white;border-color:var(--primary);}
+.date-tab .tab-sub{font-size:0.71rem;font-weight:500;opacity:.8;}
+
+/* ADMIN STATS */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:20px;}
+.stat-card{background:var(--bg);border-radius:10px;padding:18px;text-align:center;}
+.stat-num{font-size:2rem;font-weight:800;color:var(--primary);}
+.stat-lbl{font-size:0.82rem;color:var(--subtext);margin-top:4px;}
+.divider{border:none;border-top:1.5px solid var(--border);margin:18px 0;}
+
+/* SPINNER */
+.spinner{
+  display:inline-block;width:18px;height:18px;border:2.5px solid rgba(255,255,255,0.4);
+  border-top:2.5px solid white;border-radius:50%;animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TOAST */
+#toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+  background:#323232;color:white;padding:13px 22px;border-radius:10px;
+  font-size:0.93rem;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,0.22);
+  display:none;z-index:9999;animation:slideIn .3s ease;white-space:nowrap;
+}
+
+/* USER PROFILE DROPDOWN */
+.profile-dropdown{
+  position:absolute;top:68px;right:16px;background:white;border-radius:var(--radius);
+  box-shadow:var(--shadow);border:1px solid var(--border);padding:16px;min-width:220px;
+  display:none;z-index:200;
+}
+.profile-dropdown.open{display:block;}
+.profile-name{font-weight:700;font-size:1rem;}
+.profile-email{font-size:0.82rem;color:var(--subtext);margin-bottom:12px;}
+.profile-role{font-size:0.78rem;background:var(--primary-light);color:var(--primary);
+  border-radius:5px;padding:2px 8px;font-weight:700;display:inline-block;margin-bottom:12px;}
+
+/* MESSAGE BOX */
+.msg-box{font-size:0.91rem;margin-top:10px;}
+.msg-success{background:#e6f4ea;border-left:4px solid var(--success);padding:10px 14px;border-radius:8px;}
+.msg-danger{background:#fde8e8;border-left:4px solid var(--danger);padding:10px 14px;border-radius:8px;}
+.msg-warning{background:#fff3cd;border-left:4px solid var(--warning);padding:10px 14px;border-radius:8px;}
+
+/* ADMIN BADGE */
+.admin-only{display:none;}
+
+/* RESPONSIVE */
+@media(max-width:620px){
+  .topnav{padding:0 10px;height:56px;}
+  .topnav .logo{font-size:1rem;}
+  .nav-links button{padding:7px 9px;font-size:0.82rem;}
+  .main{padding:12px 8px 60px;}
+  .auth-card{padding:28px 18px;}
+  .btn-logout{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ AUTH SCREEN ═══════════════════════════ -->
+<div id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">🚗 ParkBook</div>
+    <div class="auth-sub">Smart Parking for Your Team</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Sign In</button>
+      <button class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Create Account</button>
+    </div>
+
+    <!-- LOGIN FORM -->
+    <div id="loginForm">
+      <div id="loginErr" class="auth-err"></div>
+      <div class="form-group">
+        <label>Work Email</label>
+        <input type="email" id="loginEmail" placeholder="you@company.com" autocomplete="email"/>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPass" placeholder="Your password" autocomplete="current-password"/>
+      </div>
+      <button class="btn btn-primary btn-block" id="loginBtn" onclick="doLogin()">
+        Sign In
+      </button>
+    </div>
+
+    <!-- REGISTER FORM -->
+    <div id="registerForm" style="display:none;">
+      <div id="regErr" class="auth-err"></div>
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="regName" placeholder="e.g. Danai Avratoglou"/>
+      </div>
+      <div class="form-group">
+        <label>Work Email</label>
+        <input type="email" id="regEmail" placeholder="you@company.com" autocomplete="email"/>
+      </div>
+      <div class="form-group">
+        <label>Password <span style="color:var(--subtext);font-weight:400;">(min 6 characters)</span></label>
+        <input type="password" id="regPass" placeholder="Choose a password" autocomplete="new-password"/>
+      </div>
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <input type="password" id="regPass2" placeholder="Repeat password" autocomplete="new-password"/>
+      </div>
+      <button class="btn btn-success btn-block" id="regBtn" onclick="doRegister()">
+        Create Account
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ MAIN APP ══════════════════════════════ -->
+<div id="appScreen">
+
+  <!-- TOP NAV -->
+  <nav class="topnav">
+    <div class="logo">🚗 ParkBook</div>
+    <div class="nav-links">
+      <button class="active" id="navBook"  onclick="showSection('book')">📅 Book</button>
+      <button id="navView"  onclick="showSection('view')">📋 View All</button>
+      <button id="navAdmin" class="admin-only" onclick="showSection('admin')">⚙️ Admin</button>
+    </div>
+    <div class="nav-right">
+      <div class="notif-bell" onclick="showSection('notif')" title="Notifications">
+        🔔<div class="notif-badge" id="notifBadge">0</div>
+      </div>
+      <div class="user-avatar" id="userAvatar" onclick="toggleProfileDropdown()">?</div>
+      <button class="btn-logout" onclick="doLogout()">Sign Out</button>
+    </div>
+  </nav>
+
+  <!-- PROFILE DROPDOWN -->
+  <div class="profile-dropdown" id="profileDropdown">
+    <div class="profile-name" id="pdName">—</div>
+    <div class="profile-email" id="pdEmail">—</div>
+    <div class="profile-role" id="pdRole">user</div>
+    <button class="btn btn-ghost btn-sm btn-block" onclick="doLogout()">🚪 Sign Out</button>
+  </div>
+
+  <!-- NOTIFICATION BANNER -->
+  <div class="notif-banner" id="notifBanner"></div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- BOOK SECTION -->
+    <div class="section active" id="section-book">
+      <div class="card">
+        <h2>📅 Book a Parking Spot</h2>
+        <div class="form-row">
+          <div class="form-group" style="flex:1;min-width:180px;">
+            <label>Date</label>
+            <input type="date" id="bookDate"/>
+          </div>
+          <div>
+            <button class="btn btn-primary" id="bookBtn" onclick="bookSpot()">🚗 Book Spot</button>
+          </div>
+        </div>
+        <div id="bookMsg" class="msg-box"></div>
+      </div>
+
+      <div class="card">
+        <h2>⏳ Join Waiting List</h2>
+        <p style="font-size:0.88rem;color:var(--subtext);margin-bottom:14px;">
+          If all spots are taken, add yourself to the waiting list. You'll be notified in real-time when a spot opens up.
+        </p>
+        <div class="form-row">
+          <div class="form-group" style="flex:1;min-width:180px;">
+            <label>Date</label>
+            <input type="date" id="waitDate"/>
+          </div>
+          <div>
+            <button class="btn btn-warning" id="waitBtn" onclick="joinWaitlist()">⏳ Join Waitlist</button>
+          </div>
+        </div>
+        <div id="waitMsg" class="msg-box"></div>
+      </div>
+
+      <div class="card">
+        <h2>📍 Today's Status</h2>
+        <div id="todayStatus"><div class="empty-msg">Loading...</div></div>
+      </div>
+    </div>
+
+    <!-- VIEW ALL SECTION -->
+    <div class="section" id="section-view">
+      <div class="card">
+        <h2>📋 All Bookings by Date</h2>
+        <div class="date-tabs" id="allDateTabs"></div>
+        <div id="allDayView"><div class="empty-msg">No bookings yet.</div></div>
+      </div>
+    </div>
+
+    <!-- ADMIN SECTION -->
+    <div class="section admin-only" id="section-admin">
+      <div class="card">
+        <h2>⚙️ Admin Settings</h2>
+        <div class="form-row" style="margin-bottom:14px;">
+          <div class="form-group" style="flex:1;min-width:160px;">
+            <label>Available Spots Per Day</label>
+            <input type="number" id="adminSpotsInput" min="1" max="200" placeholder="e.g. 10"/>
+          </div>
+          <div>
+            <button class="btn btn-success" onclick="saveSpots()">💾 Save</button>
+          </div>
+        </div>
+        <div id="adminMsg" class="msg-box"></div>
+        <hr class="divider"/>
+        <h2>📊 Statistics</h2>
+        <div class="stat-grid" id="adminStats"></div>
+        <hr class="divider"/>
+        <button class="btn btn-danger btn-sm" onclick="clearAllData()">🗑️ Clear All Bookings & Waitlist</button>
+      </div>
+    </div>
+
+    <!-- NOTIFICATIONS SECTION -->
+    <div class="section" id="section-notif">
+      <div class="card">
+        <h2>🔔 Notifications</h2>
+        <div id="notifList"><div class="empty-msg">No notifications yet.</div></div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /appScreen -->
+
+<div id="toast"></div>
+
+<!-- ═══════════════════════════ JAVASCRIPT ════════════════════════════ -->
+<script>
+/* ╔══════════════════════════════════════════════════════════════════╗
+   ║                   🔥 FIREBASE CONFIGURATION                     ║
+   ║  1. Go to https://console.firebase.google.com                   ║
+   ║  2. Create a project (or use an existing one)                   ║
+   ║  3. Add a Web App — copy the firebaseConfig and paste below     ║
+   ║  4. Enable Authentication → Sign-in method → Email/Password     ║
+   ║  5. Create Firestore Database (Start in test mode for dev)      ║
+   ║  6. Recommended Firestore Rules:                                ║
+   ║     rules_version = '2';                                        ║
+   ║     service cloud.firestore {                                   ║
+   ║       match /databases/{db}/documents {                         ║
+   ║         match /{doc=**} {                                       ║
+   ║           allow read, write: if request.auth != null;           ║
+   ║         }                                                       ║
+   ║       }                                                         ║
+   ║     }                                                           ║
+   ╚══════════════════════════════════════════════════════════════════╝ */
+
+const firebaseConfig = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
+};
+
+/* ─── INIT ─────────────────────────────────────────────────────── */
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+/* ─── STATE ────────────────────────────────────────────────────── */
+let currentUser   = null;   // Firebase Auth user
+let currentProfile= null;   // Firestore user doc
+let spotsPerDay   = 5;
+let unsubscribers = [];     // real-time listeners to clean up
+
+/* ─── HELPERS ──────────────────────────────────────────────────── */
+function todayStr(){
+  const d=new Date(),y=d.getFullYear(),
+        m=String(d.getMonth()+1).padStart(2,'0'),
+        dd=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+function fmtDate(str){
+  if(!str)return '';
+  const [y,m,d]=str.split('-');
+  return new Date(+y,+m-1,+d).toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+}
+function initials(name){
+  return (name||'?').trim().split(/\s+/).map(n=>n[0]).join('').toUpperCase().slice(0,2)||'?';
+}
+function fmtTs(ts){
+  if(!ts)return '';
+  const d=ts.toDate?ts.toDate():new Date(ts);
+  return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+}
+function showToast(msg,dur=3200){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.style.display='block';
+  clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',dur);
+}
+function setMsg(id,html,type){
+  const el=document.getElementById(id);
+  el.innerHTML=html?`<div class="msg-${type}">${html}</div>`:'';
+  if(html)setTimeout(()=>el.innerHTML='',5000);
+}
+function setLoading(btnId,loading){
+  const b=document.getElementById(btnId);
+  if(!b)return;
+  if(loading){b.dataset.orig=b.innerHTML;b.innerHTML='<span class="spinner"></span>';b.disabled=true;}
+  else{b.innerHTML=b.dataset.orig||b.innerHTML;b.disabled=false;}
+}
+
+/* ─── AUTH TAB SWITCH ──────────────────────────────────────────── */
+function switchAuthTab(tab){
+  const isLogin=tab==='login';
+  document.getElementById('loginForm').style.display    = isLogin?'block':'none';
+  document.getElementById('registerForm').style.display = isLogin?'none':'block';
+  document.getElementById('tabLogin').classList.toggle('active',isLogin);
+  document.getElementById('tabRegister').classList.toggle('active',!isLogin);
+}
+
+/* ─── REGISTER ─────────────────────────────────────────────────── */
+async function doRegister(){
+  const name  = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const pass  = document.getElementById('regPass').value;
+  const pass2 = document.getElementById('regPass2').value;
+  const errEl = document.getElementById('regErr');
+  errEl.style.display='none';
+  if(!name){errEl.textContent='Please enter your full name.';errEl.style.display='block';return;}
+  if(!email){errEl.textContent='Please enter your work email.';errEl.style.display='block';return;}
+  if(pass.length<6){errEl.textContent='Password must be at least 6 characters.';errEl.style.display='block';return;}
+  if(pass!==pass2){errEl.textContent='Passwords do not match.';errEl.style.display='block';return;}
+  setLoading('regBtn',true);
+  try{
+    const cred = await auth.createUserWithEmailAndPassword(email,pass);
+    await cred.user.updateProfile({displayName:name});
+    // Check if first user → admin
+    const usersSnap = await db.collection('users').get();
+    const role = usersSnap.empty ? 'admin' : 'user';
+    await db.collection('users').doc(cred.user.uid).set({
+      uid:cred.user.uid, name, email, role, createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    // Ensure settings doc exists
+    const settingsRef = db.collection('settings').doc('config');
+    const settingsSnap = await settingsRef.get();
+    if(!settingsSnap.exists) await settingsRef.set({spotsPerDay:5});
+  }catch(e){
+    errEl.textContent=friendlyAuthError(e.code);errEl.style.display='block';
+    setLoading('regBtn',false);
+  }
+}
+
+/* ─── LOGIN ────────────────────────────────────────────────────── */
+async function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass =document.getElementById('loginPass').value;
+  const errEl=document.getElementById('loginErr');
+  errEl.style.display='none';
+  if(!email||!pass){errEl.textContent='Please fill in all fields.';errEl.style.display='block';return;}
+  setLoading('loginBtn',true);
+  try{
+    await auth.signInWithEmailAndPassword(email,pass);
+  }catch(e){
+    errEl.textContent=friendlyAuthError(e.code);errEl.style.display='block';
+    setLoading('loginBtn',false);
+  }
+}
+
+/* ─── LOGOUT ───────────────────────────────────────────────────── */
+async function doLogout(){
+  unsubscribers.forEach(u=>u());unsubscribers=[];
+  await auth.signOut();
+}
+
+/* ─── FRIENDLY ERROR MESSAGES ──────────────────────────────────── */
+function friendlyAuthError(code){
+  const map={
+    'auth/email-already-in-use':'This email is already registered.',
+    'auth/invalid-email':'Please enter a valid email address.',
+    'auth/wrong-password':'Incorrect password. Please try again.',
+    'auth/user-not-found':'No account found with this email.',
+    'auth/weak-password':'Password is too weak. Use at least 6 characters.',
+    'auth/too-many-requests':'Too many attempts. Please wait a moment.',
+    'auth/network-request-failed':'Network error. Please check your connection.',
+  };
+  return map[code]||'Something went wrong. Please try again.';
+}
+
+/* ─── AUTH STATE LISTENER ──────────────────────────────────────── */
+auth.onAuthStateChanged(async user=>{
+  if(user){
+    currentUser=user;
+    // Load profile
+    const snap=await db.collection('users').doc(user.uid).get();
+    currentProfile=snap.exists?snap.data():{uid:user.uid,name:user.displayName||user.email,email:user.email,role:'user'};
+    await loadSettings();
+    showApp();
+  }else{
+    currentUser=null;currentProfile=null;
+    showAuth();
+  }
+});
+
+/* ─── LOAD SETTINGS ────────────────────────────────────────────── */
+async function loadSettings(){
+  const snap=await db.collection('settings').doc('config').get();
+  spotsPerDay=snap.exists?(snap.data().spotsPerDay||5):5;
+}
+
+/* ─── SHOW/HIDE SCREENS ────────────────────────────────────────── */
+function showAuth(){
+  document.getElementById('authScreen').style.display='flex';
+  document.getElementById('appScreen').style.display='none';
+}
+function showApp(){
+  document.getElementById('authScreen').style.display='none';
+  document.getElementById('appScreen').style.display='block';
+  // Update avatar & profile dropdown
+  const name=currentProfile.name||'?';
+  document.getElementById('userAvatar').textContent=initials(name);
+  document.getElementById('pdName').textContent=name;
+  document.getElementById('pdEmail').textContent=currentProfile.email||'';
+  document.getElementById('pdRole').textContent=currentProfile.role==='admin'?'👑 Admin':'👤 User';
+  // Show admin elements
+  const isAdmin=currentProfile.role==='admin';
+  document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
+  // Default dates
+  const today=todayStr();
+  document.getElementById('bookDate').value=today;
+  document.getElementById('waitDate').value=today;
+  if(document.getElementById('adminSpotsInput'))
+    document.getElementById('adminSpotsInput').value=spotsPerDay;
+  // Start real-time listeners
+  startListeners();
+  showSection('book');
+}
+
+/* ─── NAVIGATION ───────────────────────────────────────────────── */
+function showSection(name){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  const el=document.getElementById('section-'+name);
+  if(el)el.classList.add('active');
+  ['book','view','admin'].forEach(n=>{
+    const btn=document.getElementById('nav'+n.charAt(0).toUpperCase()+n.slice(1));
+    if(btn)btn.classList.toggle('active',n===name);
+  });
+  closeProfileDropdown();
+  if(name==='view')renderViewAll();
+  if(name==='admin')renderAdminStats();
+  if(name==='notif')renderNotifications();
+}
+function toggleProfileDropdown(){
+  document.getElementById('profileDropdown').classList.toggle('open');
+}
+function closeProfileDropdown(){
+  document.getElementById('profileDropdown').classList.remove('open');
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#profileDropdown')&&!e.target.closest('#userAvatar'))
+    closeProfileDropdown();
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   REAL-TIME LISTENERS
+════════════════════════════════════════════════════════════════ */
+function startListeners(){
+  // Settings
+  const u1=db.collection('settings').doc('config').onSnapshot(snap=>{
+    if(snap.exists){
+      spotsPerDay=snap.data().spotsPerDay||5;
+      renderTodayStatus();
+    }
+  });
+  // Bookings
+  const u2=db.collection('bookings').onSnapshot(()=>{ renderTodayStatus(); });
+  // Waitlist
+  const u3=db.collection('waitlist').onSnapshot(()=>{ renderTodayStatus(); });
+  // Notifications for current user
+  const u4=db.collection('notifications')
+    .where('uid','==',currentUser.uid)
+    .onSnapshot(snap=>{
+      const unread=snap.docs.filter(d=>!d.data().read).length;
+      const badge=document.getElementById('notifBadge');
+      badge.textContent=unread;
+      badge.style.display=unread>0?'flex':'none';
+      showNotifBanner(snap.docs.map(d=>({id:d.id,...d.data()})));
+    });
+  unsubscribers=[u1,u2,u3,u4];
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TODAY STATUS
+════════════════════════════════════════════════════════════════ */
+async function renderTodayStatus(){
+  const date=todayStr();
+  const [bSnap,wSnap]=await Promise.all([
+    db.collection('bookings').where('date','==',date).get(),
+    db.collection('waitlist').where('date','==',date).orderBy('joinedAt').get()
+  ]);
+  const bookings=bSnap.docs.map(d=>({id:d.id,...d.data()}));
+  const waiting =wSnap.docs.map(d=>({id:d.id,...d.data()}));
+  renderDayHTML('todayStatus',date,bookings,waiting,true);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BOOK A SPOT
+════════════════════════════════════════════════════════════════ */
+async function bookSpot(){
+  const date=document.getElementById('bookDate').value;
+  if(!date){setMsg('bookMsg','❌ Please select a date.','danger');return;}
+  if(!currentUser){return;}
+  setLoading('bookBtn',true);
+  try{
+    // Check existing booking by this user for this date
+    const mySnap=await db.collection('bookings')
+      .where('date','==',date).where('uid','==',currentUser.uid).get();
+    if(!mySnap.empty){
+      setMsg('bookMsg',`⚠️ You already have a booking for <b>${fmtDate(date)}</b>.`,'warning');
+      setLoading('bookBtn',false);return;
+    }
+    // Count bookings for this date
+    const allSnap=await db.collection('bookings').where('date','==',date).get();
+    if(allSnap.size>=spotsPerDay){
+      setMsg('bookMsg',`🚫 No spots available for <b>${fmtDate(date)}</b>. Please join the waiting list.`,'danger');
+      setLoading('bookBtn',false);return;
+    }
+    // Assign spot number
+    const usedSpots=allSnap.docs.map(d=>d.data().spot||0);
+    let spotNum=1; while(usedSpots.includes(spotNum))spotNum++;
+    await db.collection('bookings').add({
+      uid:currentUser.uid,
+      name:currentProfile.name,
+      email:currentProfile.email,
+      date,spot:spotNum,
+      bookedAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    // Remove from waitlist if present
+    const wSnap=await db.collection('waitlist')
+      .where('date','==',date).where('uid','==',currentUser.uid).get();
+    wSnap.docs.forEach(d=>d.ref.delete());
+    setMsg('bookMsg',`✅ <b>Spot #${spotNum}</b> booked for <b>${fmtDate(date)}</b>! 🎉`,'success');
+    showToast(`🚗 Spot #${spotNum} booked for ${fmtDate(date)}!`);
+  }catch(e){
+    setMsg('bookMsg','❌ Error: '+e.message,'danger');
+  }
+  setLoading('bookBtn',false);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   JOIN WAITLIST
+════════════════════════════════════════════════════════════════ */
+async function joinWaitlist(){
+  const date=document.getElementById('waitDate').value;
+  if(!date){setMsg('waitMsg','❌ Please select a date.','danger');return;}
+  setLoading('waitBtn',true);
+  try{
+    const allSnap=await db.collection('bookings').where('date','==',date).get();
+    if(allSnap.size<spotsPerDay){
+      setMsg('waitMsg',`💡 There are still available spots for <b>${fmtDate(date)}</b>. Book directly above!`,'warning');
+      setLoading('waitBtn',false);return;
+    }
+    // Check if already on waitlist
+    const myWSnap=await db.collection('waitlist')
+      .where('date','==',date).where('uid','==',currentUser.uid).get();
+    if(!myWSnap.empty){
+      setMsg('waitMsg',`⚠️ You are already on the waitlist for <b>${fmtDate(date)}</b>.`,'warning');
+      setLoading('waitBtn',false);return;
+    }
+    // Check if already booked
+    const myBSnap=await db.collection('bookings')
+      .where('date','==',date).where('uid','==',currentUser.uid).get();
+    if(!myBSnap.empty){
+      setMsg('waitMsg',`⚠️ You already have a booking for <b>${fmtDate(date)}</b>.`,'warning');
+      setLoading('waitBtn',false);return;
+    }
+    const wSnap=await db.collection('waitlist').where('date','==',date).orderBy('joinedAt').get();
+    const pos=wSnap.size+1;
+    await db.collection('waitlist').add({
+      uid:currentUser.uid, name:currentProfile.name, email:currentProfile.email,
+      date, position:pos, joinedAt:firebase.firestore.FieldValue.serverTimestamp(), notified:false
+    });
+    setMsg('waitMsg',`✅ You're on the waitlist for <b>${fmtDate(date)}</b>. Position: <b>#${pos}</b>. We'll notify you when a spot opens!`,'success');
+    showToast(`⏳ Added to waitlist for ${fmtDate(date)} — Position #${pos}`);
+  }catch(e){
+    setMsg('waitMsg','❌ Error: '+e.message,'danger');
+  }
+  setLoading('waitBtn',false);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CANCEL BOOKING
+════════════════════════════════════════════════════════════════ */
+async function cancelBooking(bookingId, date){
+  if(!confirm('Cancel this booking?'))return;
+  try{
+    await db.collection('bookings').doc(bookingId).delete();
+    // Notify first on waitlist
+    const wSnap=await db.collection('waitlist')
+      .where('date','==',date).where('notified','==',false).orderBy('joinedAt').limit(1).get();
+    if(!wSnap.empty){
+      const wDoc=wSnap.docs[0];
+      const wData=wDoc.data();
+      await wDoc.ref.update({notified:true});
+      // Create notification
+      await db.collection('notifications').add({
+        uid:wData.uid, name:wData.name, date,
+        message:`🔔 ${wData.name}, a parking spot is now available for ${fmtDate(date)}! Log in and book it now.`,
+        createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+        read:false
+      });
+    }
+    showToast('Booking cancelled.');
+    renderTodayStatus();
+  }catch(e){showToast('Error: '+e.message);}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   REMOVE FROM WAITLIST
+════════════════════════════════════════════════════════════════ */
+async function removeWait(waitId){
+  if(!confirm('Remove from waitlist?'))return;
+  try{
+    await db.collection('waitlist').doc(waitId).delete();
+    showToast('Removed from waitlist.');
+    renderTodayStatus();
+  }catch(e){showToast('Error: '+e.message);}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RENDER DAY HTML (reused for Today + View All)
+════════════════════════════════════════════════════════════════ */
+function renderDayHTML(containerId, date, bookings, waiting, showMyBtns){
+  const booked=bookings.length;
+  const avail=Math.max(0,spotsPerDay-booked);
+  const pct=Math.round((booked/spotsPerDay)*100);
+  const isAdmin=currentProfile&&currentProfile.role==='admin';
+
+  let sc='status-available',dc='dot-green',st=`✅ ${avail} spot${avail!==1?'s':''} available`;
+  if(avail===0){sc='status-full';dc='dot-red';st='🚫 Fully booked';}
+  else if(avail<=Math.ceil(spotsPerDay*0.3)){sc='status-almost';dc='dot-orange';st=`⚠️ Only ${avail} spot${avail!==1?'s':''} left`;}
+
+  let bg=avail===0?'var(--danger)':avail<=Math.ceil(spotsPerDay*0.3)?'var(--warning)':'var(--success)';
+  let html=`
+    <div class="status-bar ${sc}">
+      <div class="status-dot ${dc}"></div>
+      <span>${st}</span>
+      <span style="margin-left:auto;font-size:0.83rem;">${booked} / ${spotsPerDay} booked</span>
+    </div>
+    <div class="progress-wrap"><div class="progress-fill" style="width:${pct}%;background:${bg}"></div></div>`;
+
+  if(bookings.length>0){
+    html+=`<div class="section-label">Bookings — ${fmtDate(date)}</div><div class="list">`;
+    bookings.forEach(b=>{
+      const canCancel=isAdmin||(currentUser&&b.uid===currentUser.uid);
+      html+=`<div class="booking-item">
+        <div class="avatar">${initials(b.name)}</div>
+        <div class="item-info">
+          <div class="item-name">${b.name}</div>
+          <div class="item-sub">${b.email||''} · Booked ${fmtTs(b.bookedAt)}</div>
+        </div>
+        <span class="spot-badge">Spot #${b.spot}</span>
+        ${canCancel?`<button class="btn btn-danger btn-sm" onclick="cancelBooking('${b.id}','${date}')">Cancel</button>`:''}
+      </div>`;
+    });
+    html+='</div>';
+  } else {
+    html+='<div class="empty-msg">No bookings yet for this day.</div>';
+  }
+
+  if(waiting.length>0){
+    html+=`<div class="section-label">⏳ Waiting List — ${waiting.length} person${waiting.length!==1?'s':''}</div><div class="list">`;
+    waiting.forEach((w,i)=>{
+      const canRemove=isAdmin||(currentUser&&w.uid===currentUser.uid);
+      html+=`<div class="waiting-item">
+        <div class="avatar avatar-warn">${initials(w.name)}</div>
+        <div class="item-info">
+          <div class="item-name">${w.name}</div>
+          <div class="item-sub">${w.email||''} · Joined ${fmtTs(w.joinedAt)}</div>
+        </div>
+        ${w.notified?'<span class="notified-badge">🔔 Spot Open!</span>':`<span class="wait-badge">#${i+1}</span>`}
+        ${canRemove?`<button class="btn btn-danger btn-sm" onclick="removeWait('${w.id}')">Remove</button>`:''}
+      </div>`;
+    });
+    html+='</div>';
+  }
+
+  document.getElementById(containerId).innerHTML=html;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VIEW ALL
+════════════════════════════════════════════════════════════════ */
+let viewSelDate=null;
+async function renderViewAll(){
+  const [bSnap,wSnap]=await Promise.all([
+    db.collection('bookings').get(),
+    db.collection('waitlist').get()
+  ]);
+  const allDates=[...new Set([
+    ...bSnap.docs.map(d=>d.data().date),
+    ...wSnap.docs.map(d=>d.data().date)
+  ])].sort();
+
+  const tabsEl=document.getElementById('allDateTabs');
+  const viewEl=document.getElementById('allDayView');
+
+  if(allDates.length===0){
+    tabsEl.innerHTML='';
+    viewEl.innerHTML='<div class="empty-msg">No bookings yet. Be the first!</div>';
+    return;
+  }
+  if(!viewSelDate||!allDates.includes(viewSelDate))viewSelDate=allDates[0];
+
+  // Count per date
+  const countMap={};
+  bSnap.docs.forEach(d=>{const dt=d.data().date;countMap[dt]=(countMap[dt]||0)+1;});
+
+  tabsEl.innerHTML=allDates.map(d=>{
+    const cnt=countMap[d]||0;
+    const avail=Math.max(0,spotsPerDay-cnt);
+    const col=avail===0?'var(--danger)':avail<=Math.ceil(spotsPerDay*0.3)?'var(--warning)':'var(--success)';
+    const isActive=d===viewSelDate;
+    return `<div class="date-tab ${isActive?'active':''}" onclick="selectViewDate('${d}')">
+      <span>${fmtDate(d)}</span>
+      <span class="tab-sub" style="color:${isActive?'rgba(255,255,255,.85)':col}">${cnt}/${spotsPerDay} booked</span>
+    </div>`;
+  }).join('');
+
+  // Load day
+  const dayBookings=bSnap.docs.filter(d=>d.data().date===viewSelDate).map(d=>({id:d.id,...d.data()}));
+  const dayWait=wSnap.docs.filter(d=>d.data().date===viewSelDate)
+    .map(d=>({id:d.id,...d.data()}))
+    .sort((a,b)=>(a.joinedAt?.seconds||0)-(b.joinedAt?.seconds||0));
+  renderDayHTML('allDayView',viewSelDate,dayBookings,dayWait,true);
+}
+function selectViewDate(d){viewSelDate=d;renderViewAll();}
+
+/* ═══════════════════════════════════════════════════════════════
+   ADMIN
+════════════════════════════════════════════════════════════════ */
+async function saveSpots(){
+  const val=parseInt(document.getElementById('adminSpotsInput').value);
+  if(!val||val<1){setMsg('adminMsg','❌ Please enter a valid number.','danger');return;}
+  await db.collection('settings').doc('config').set({spotsPerDay:val},{merge:true});
+  spotsPerDay=val;
+  setMsg('adminMsg',`✅ Spots per day updated to <b>${val}</b>.`,'success');
+  showToast(`Settings saved: ${val} spots/day`);
+}
+async function renderAdminStats(){
+  const [bSnap,wSnap,uSnap]=await Promise.all([
+    db.collection('bookings').get(),
+    db.collection('waitlist').get(),
+    db.collection('users').get()
+  ]);
+  const days=new Set(bSnap.docs.map(d=>d.data().date)).size;
+  document.getElementById('adminStats').innerHTML=`
+    <div class="stat-card"><div class="stat-num">${spotsPerDay}</div><div class="stat-lbl">Spots / Day</div></div>
+    <div class="stat-card"><div class="stat-num">${bSnap.size}</div><div class="stat-lbl">Total Bookings</div></div>
+    <div class="stat-card"><div class="stat-num">${wSnap.size}</div><div class="stat-lbl">On Waitlist</div></div>
+    <div class="stat-card"><div class="stat-num">${uSnap.size}</div><div class="stat-lbl">Registered Users</div></div>
+    <div class="stat-card"><div class="stat-num">${days}</div><div class="stat-lbl">Days with Bookings</div></div>`;
+}
+async function clearAllData(){
+  if(!confirm('Delete ALL bookings and waitlist entries? This cannot be undone!'))return;
+  const batch=db.batch();
+  const [b,w]=await Promise.all([db.collection('bookings').get(),db.collection('waitlist').get()]);
+  b.docs.forEach(d=>batch.delete(d.ref));
+  w.docs.forEach(d=>batch.delete(d.ref));
+  await batch.commit();
+  showToast('🗑️ All bookings and waitlist entries deleted.');
+  renderAdminStats();renderTodayStatus();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NOTIFICATIONS
+════════════════════════════════════════════════════════════════ */
+function showNotifBanner(notifs){
+  const unread=notifs.filter(n=>!n.read);
+  const banner=document.getElementById('notifBanner');
+  if(unread.length===0){banner.classList.remove('show');return;}
+  banner.innerHTML=unread.map(n=>`
+    <div class="notif-item-banner">
+      <span>🔔 <b>${n.name}</b>, a parking spot opened for <b>${fmtDate(n.date)}</b>! Book it now before it's gone.</span>
+      <button onclick="dismissNotif('${n.id}')" title="Dismiss">✕</button>
+    </div>`).join('');
+  banner.classList.add('show');
+}
+async function dismissNotif(id){
+  await db.collection('notifications').doc(id).update({read:true});
+}
+async function renderNotifications(){
+  const snap=await db.collection('notifications')
+    .where('uid','==',currentUser.uid)
+    .orderBy('createdAt','desc').get();
+  const el=document.getElementById('notifList');
+  if(snap.empty){el.innerHTML='<div class="empty-msg">No notifications yet.</div>';return;}
+  el.innerHTML=snap.docs.map(d=>{
+    const n={id:d.id,...d.data()};
+    return `<div class="booking-item" style="${n.read?'opacity:.6':''}">
+      <div class="avatar" style="background:${n.read?'#aaa':'var(--success)'}">🔔</div>
+      <div class="item-info">
+        <div class="item-name">${n.message||n.name}</div>
+        <div class="item-sub">${fmtTs(n.createdAt)} · ${fmtDate(n.date)}</div>
+      </div>
+      ${n.read?'<span style="font-size:.8rem;color:var(--subtext)">Read</span>':'<span class="notified-badge">NEW</span>'}
+    </div>`;
+  }).join('');
+  // Mark all as read
+  const batch=db.batch();
+  snap.docs.forEach(d=>{ if(!d.data().read) batch.update(d.ref,{read:true}); });
+  await batch.commit();
+}
+</script>
+</body>
+</html>

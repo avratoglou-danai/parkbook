@@ -356,15 +356,21 @@ function friendlyAuthError(code){
   return map[code]||'Something went wrong. Please try again.';
 }
 
+
 auth.onAuthStateChanged(async user=>{
   if(user){
     currentUser=user;
-    const snap=await db.collection('users').doc(user.uid).get();
+    let snap=await db.collection('users').doc(user.uid).get();
+    if(!snap.exists){
+      await new Promise(r=>setTimeout(r,1500));
+      snap=await db.collection('users').doc(user.uid).get();
+    }
     currentProfile=snap.exists?snap.data():{uid:user.uid,name:user.displayName||user.email,email:user.email,role:'user'};
     await loadSettings();
     showApp();
   }else{currentUser=null;currentProfile=null;showAuth();}
 });
+
 
 async function loadSettings(){
   const snap=await db.collection('settings').doc('config').get();
@@ -384,13 +390,38 @@ function showApp(){
   document.getElementById('pdName').textContent=name;
   document.getElementById('pdEmail').textContent=currentProfile.email||'';
   document.getElementById('pdRole').textContent=currentProfile.role==='admin'?'\uD83D\uDEE1\uFE0F Admin':'\uD83D\uDC64 User';
-  const isAdmin=currentProfile.role==='admin';
+
+  const isAdmin=currentProfile&&currentProfile.role==='admin';
   document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
+  const _navAdmin=document.getElementById('navAdmin');
+  if(_navAdmin)_navAdmin.style.display=isAdmin?'inline-flex':'none'
+
   document.getElementById('bookDate').value=todayStr();
   document.getElementById('waitDate').value=todayStr();
   if(document.getElementById('adminSpotsInput'))document.getElementById('adminSpotsInput').value=spotsPerDay;
+  
+
+async function refreshAdminUI(){
+  if(!currentUser)return;
+  try{
+    const snap=await db.collection('users').doc(currentUser.uid).get();
+    if(snap.exists){
+      currentProfile=snap.data();
+      const isAdmin=currentProfile.role==='admin';
+      document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
+      const _nav=document.getElementById('navAdmin');
+      if(_nav)_nav.style.display=isAdmin?'inline-flex':'none';
+      const pdRole=document.getElementById('pdRole');
+      if(pdRole)pdRole.textContent=isAdmin?'🛡️ Admin':'👤 User';
+    }
+  }catch(e){console.warn('refreshAdminUI:',e);}
+}
+
+
   startListeners();
   showSection('book');
+  setTimeout(refreshAdminUI,1000);
+
 }
 
 function showSection(name){
